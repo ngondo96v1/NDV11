@@ -1,11 +1,27 @@
-<div align="center">
+# NDV Money - Architecture
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+This application follows the standard modern web architecture:
 
-  <h1>Built with AI Studio</h2>
+## 1. Frontend (Vercel)
+- **Framework**: React 18+ with Vite
+- **Styling**: Tailwind CSS 4.0
+- **Deployment**: Deployed as a static Single Page Application (SPA) on Vercel.
+- **Routing**: Client-side routing with fallback to `index.html`.
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 2. Backend / Serverless (Vercel)
+- **Framework**: Express.js
+- **Runtime**: Node.js Serverless Functions
+- **Entry Point**: `/api/index.ts`
+- **Integration**: The Express app is decoupled and exported as a standalone module, allowing it to run both as a serverless function on Vercel and as a traditional Express server locally.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## 3. Database (Supabase)
+- **Provider**: Supabase (PostgreSQL)
+- **Integration**: Connected via `@supabase/supabase-js` in the backend layer.
+- **Security**: Service Role Key used server-side for secure data operations.
 
-</div>
+## Local Development
+Run the unified server:
+```bash
+npm run dev
+```
+This starts the Express server which proxies Vite for the frontend and handles API requests.

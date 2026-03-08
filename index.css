@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-in-from-top {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes slide-in-from-right {
+    from { transform: translateX(10px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes zoom-in {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s infinite ease-in-out;
+  }
+
+  .animate-in {
+    animation-duration: 500ms;
+    animation-fill-mode: both;
+  }
+  .fade-in {
+    animation-name: fade-in;
+  }
+  .slide-in-from-top-2 {
+    animation-name: slide-in-from-top;
+  }
+  .slide-in-from-right-4 {
+    animation-name: slide-in-from-right;
+  }
+  .zoom-in {
+    animation-name: zoom-in;
+  }
+  .duration-300 {
+    animation-duration: 300ms;
+  }
+  .duration-500 {
+    animation-duration: 500ms;
+  }
+  .duration-700 {
+    animation-duration: 700ms;
+  }
+}
+
+:root {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+}
+
+html, body, #root {
+  height: 100dvh;
+  overflow: hidden;
+  width: 100%;
+}
+
+body {
+  background-color: black;
+  color: white;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
