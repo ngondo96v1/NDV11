@@ -8,10 +8,9 @@ interface LoginProps {
   error?: string | null;
   rememberMe: boolean;
   onToggleRememberMe: (val: boolean) => void;
-  isLoadingData?: boolean;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, onNavigateRegister, error, rememberMe, onToggleRememberMe, isLoadingData }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onNavigateRegister, error, rememberMe, onToggleRememberMe }) => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -174,10 +173,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onNavigateRegister, error, remem
 
         <button
           type="submit"
-          disabled={isLoadingData}
-          className={`w-full bg-[#ff8c00] hover:bg-[#ffa500] text-black font-black text-sm py-3.5 rounded-xl mt-3 transition-all active:scale-95 shadow-xl shadow-orange-900/20 ${isLoadingData ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className="w-full bg-[#ff8c00] hover:bg-[#ffa500] text-black font-black text-sm py-3.5 rounded-xl mt-3 transition-all active:scale-95 shadow-xl shadow-orange-900/20"
         >
-          {isLoadingData ? 'ĐANG TẢI DỮ LIỆU...' : 'ĐĂNG NHẬP'}
+          ĐĂNG NHẬP
         </button>
       </form>
 

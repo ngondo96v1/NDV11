@@ -230,14 +230,22 @@ const LoanApplication: React.FC<LoanApplicationProps> = ({ user, loans, systemBu
 
   const dueDate = getCalculatedDueDate();
 
-  // Tính tổng tiền vay trong chu kỳ hiện tại (các khoản vay có cùng tháng/năm hạn)
-  // Chỉ tính các khoản vay chưa tất toán (ĐANG NỢ, CHỜ DUYỆT, ĐÃ DUYỆT, ĐANG GIẢI NGÂN, CHỜ TẤT TOÁN)
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  // Tính tổng tiền vay trong chu kỳ hiện tại (các khoản vay được TẠO trong tháng/năm hiện tại)
+  // Chỉ tính các khoản vay chưa tất toán hoàn toàn (ĐANG NỢ, CHỜ DUYỆT, ĐÃ DUYỆT, ĐANG GIẢI NGÂN, CHỜ TẤT TOÁN)
   const currentCycleTotal = loans
     .filter(l => {
       if (l.status === 'BỊ TỪ CHỐI' || l.status === 'ĐÃ TẤT TOÁN') return false;
-      const [d, m, y] = l.date.split('/').map(Number);
-      const [targetD, targetM, targetY] = dueDate.split('/').map(Number);
-      return m === targetM && y === targetY;
+      
+      // Parse createdAt: "HH:mm:ss DD/MM/YYYY"
+      const parts = l.createdAt.split(' ');
+      const datePart = parts.length > 1 ? parts[1] : parts[0];
+      const [d, m, y] = datePart.split('/').map(Number);
+      
+      return m === currentMonth && y === currentYear;
     })
     .reduce((sum, l) => sum + l.amount, 0);
 
@@ -325,12 +333,9 @@ const LoanApplication: React.FC<LoanApplicationProps> = ({ user, loans, systemBu
 
   const renderList = () => {
     // Logic giới hạn 10tr chu kỳ:
-    // Hợp đồng mới nhất (để xét quy tắc N+1)
-    const lastLoan = loans.length > 0 ? loans[0] : null;
-    
     // Khoản vay trước đó phải được xử lý xong (không ở trạng thái chờ)
     // Các trạng thái chặn vay mới: CHỜ DUYỆT, ĐÃ DUYỆT, ĐANG GIẢI NGÂN, CHỜ TẤT TOÁN
-    const isPreviousLoanPending = lastLoan && ['CHỜ DUYỆT', 'ĐÃ DUYỆT', 'ĐANG GIẢI NGÂN', 'CHỜ TẤT TOÁN'].includes(lastLoan.status);
+    const isPreviousLoanPending = loans.some(l => ['CHỜ DUYỆT', 'ĐÃ DUYỆT', 'ĐANG GIẢI NGÂN', 'CHỜ TẤT TOÁN'].includes(l.status));
 
     const today = new Date();
     

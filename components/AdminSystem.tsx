@@ -1,18 +1,106 @@
 
-import React, { useState } from 'react';
-import { Database, Settings, AlertCircle, RefreshCw, X, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Database, Settings, AlertCircle, RefreshCw, X, Check, Download, Upload, Loader2 } from 'lucide-react';
 
 interface AdminSystemProps {
   onReset: () => void;
+  onImportSuccess: () => void;
   onBack: () => void;
 }
 
-const AdminSystem: React.FC<AdminSystemProps> = ({ onReset, onBack }) => {
+const AdminSystem: React.FC<AdminSystemProps> = ({ onReset, onImportSuccess, onBack }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleResetExecute = () => {
     onReset();
     setShowResetConfirm(false);
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/data?isAdmin=true');
+      if (!response.ok) throw new Error('Failed to fetch data');
+      const data = await response.json();
+      
+      // Remove sensitive or unnecessary fields if needed
+      const exportData = {
+        ...data,
+        exportDate: new Date().toISOString(),
+        version: '1.26'
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ndv_money_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export error:', e);
+      alert('Lỗi khi xuất dữ liệu');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportMessage(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const content = event.target?.result as string;
+          const data = JSON.parse(content);
+
+          // Basic validation
+          if (!data.users || !data.loans) {
+            throw new Error('Định dạng file không hợp lệ');
+          }
+
+          const response = await fetch('/api/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Lỗi khi nhập dữ liệu');
+          }
+
+          setImportMessage({ type: 'success', text: 'Nhập dữ liệu thành công! Hệ thống đang cập nhật...' });
+          setTimeout(() => onImportSuccess(), 1500);
+        } catch (err: any) {
+          setImportMessage({ type: 'error', text: err.message || 'Lỗi khi xử lý file' });
+        } finally {
+          setIsImporting(false);
+        }
+      };
+      reader.readAsText(file);
+    } catch (e) {
+      setIsImporting(false);
+      setImportMessage({ type: 'error', text: 'Lỗi khi đọc file' });
+    }
+    
+    // Reset input
+    e.target.value = '';
   };
 
   return (
@@ -30,6 +118,53 @@ const AdminSystem: React.FC<AdminSystemProps> = ({ onReset, onBack }) => {
           <Database className="text-[#ff8c00]" size={18} />
           <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Quản lý dữ liệu</h4>
         </div>
+
+        {/* Backup & Restore */}
+        <div className="grid grid-cols-2 gap-3">
+          <button 
+            onClick={handleExport}
+            disabled={isExporting}
+            className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center gap-3 hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50"
+          >
+            <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500">
+              {isExporting ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+            </div>
+            <div className="text-center">
+              <h5 className="text-[9px] font-black text-white uppercase tracking-widest">Xuất dữ liệu</h5>
+              <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Sao lưu JSON</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={handleImportClick}
+            disabled={isImporting}
+            className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center gap-3 hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50"
+          >
+            <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center text-green-500">
+              {isImporting ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
+            </div>
+            <div className="text-center">
+              <h5 className="text-[9px] font-black text-white uppercase tracking-widest">Nhập dữ liệu</h5>
+              <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Khôi phục từ file</p>
+            </div>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              accept=".json" 
+              className="hidden" 
+            />
+          </button>
+        </div>
+
+        {importMessage && (
+          <div className={`p-4 rounded-2xl border text-[9px] font-black uppercase tracking-widest flex items-center gap-3 animate-in slide-in-from-top-2 duration-300 ${
+            importMessage.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-red-500/10 border-red-500/20 text-red-500'
+          }`}>
+            {importMessage.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+            {importMessage.text}
+          </div>
+        )}
 
         <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-5 space-y-5">
           <div className="flex gap-3.5">

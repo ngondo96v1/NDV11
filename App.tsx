@@ -10,7 +10,8 @@ import Profile from './components/Profile';
 import AdminDashboard from './components/AdminDashboard';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminBudget from './components/AdminBudget';
-import { User as UserIcon, Home, Briefcase, Medal, LayoutGrid, Users, Wallet, AlertTriangle, X, Database } from 'lucide-react';
+import AdminSystem from './components/AdminSystem';
+import { User as UserIcon, Home, Briefcase, Medal, LayoutGrid, Users, Wallet, AlertTriangle, X, Database, Settings } from 'lucide-react';
 import { compressImage, generateContractId } from './utils';
 import BankUpdateWarning from './components/BankUpdateWarning';
 import DatabaseErrorModal from './components/DatabaseErrorModal';
@@ -511,6 +512,16 @@ const App: React.FC = () => {
 
   const handleApplyLoan = async (amount: number, signature?: string) => {
     if (!user || isProcessingRef.current) return;
+
+    // Chặn spam: Kiểm tra xem có khoản vay nào đang chờ xử lý không
+    const userLoans = loans.filter(l => l.userId === user.id);
+    const hasPending = userLoans.some(l => ['CHỜ DUYỆT', 'ĐÃ DUYỆT', 'ĐANG GIẢI NGÂN', 'CHỜ TẤT TOÁN'].includes(l.status));
+    
+    if (hasPending) {
+      alert("Bạn đang có một khoản vay đang được xử lý. Vui lòng đợi cho đến khi khoản vay hiện tại hoàn tất trước khi đăng ký khoản mới.");
+      return;
+    }
+
     isProcessingRef.current = true;
     setIsGlobalProcessing(true);
     try {
@@ -595,7 +606,8 @@ const App: React.FC = () => {
       });
 
       // Chuyển sang Zalo nếu là khoản vay đầu tiên và chưa từng chuyển
-      if (nextSeq === 1 && !user.hasJoinedZalo) {
+      const hasAnyPriorLoans = loans.some(l => l.userId === user.id);
+      if (nextSeq === 1 && !user.hasJoinedZalo && !hasAnyPriorLoans) {
         setTimeout(() => {
           window.location.assign('https://zalo.me/g/escncv086');
         }, 800);
@@ -1138,6 +1150,46 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSystemRefresh = async (targetView: AppView = AppView.LOGIN) => {
+    setIsGlobalProcessing(true);
+    try {
+      // Clear local storage if logging out
+      if (targetView === AppView.LOGIN) {
+        localStorage.removeItem('ndv_user_id');
+        setUser(null);
+      }
+      
+      // Force immediate data fetch
+      const params = new URLSearchParams();
+      params.append('checkStorage', 'true');
+      params.append('t', Date.now().toString());
+      
+      const response = await fetch(`/api/data?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch data');
+      
+      const data = await response.json();
+      
+      if (data.users) setRegisteredUsers(data.users);
+      if (data.loans) setLoans(data.loans);
+      if (data.notifications) setNotifications(data.notifications);
+      if (data.budget !== undefined) setSystemBudget(data.budget);
+      if (data.rankProfit !== undefined) setRankProfit(data.rankProfit);
+      if (data.loanProfit !== undefined) setLoanProfit(data.loanProfit);
+      if (data.monthlyStats) setMonthlyStats(data.monthlyStats);
+      
+      setStorageFull(data.storageFull);
+      setStorageUsage(data.storageUsage);
+      
+      setCurrentView(targetView);
+    } catch (e) {
+      console.error("Lỗi làm mới hệ thống:", e);
+      // Fallback to reload if everything fails
+      window.location.href = window.location.origin;
+    } finally {
+      setIsGlobalProcessing(false);
+    }
+  };
+
   const renderView = () => {
     switch (currentView) {
       case AppView.LOGIN: return (
@@ -1147,7 +1199,6 @@ const App: React.FC = () => {
           error={loginError}
           rememberMe={rememberMe}
           onToggleRememberMe={setRememberMe}
-          isLoadingData={registeredUsers.length === 0}
         />
       );
       case AppView.REGISTER: return <Register onBack={() => setCurrentView(AppView.LOGIN)} onRegister={handleRegister} onClearError={() => setRegisterError(null)} error={registerError} />;
@@ -1256,6 +1307,21 @@ const App: React.FC = () => {
                 console.error("Lỗi cập nhật ngân sách:", e);
               }
             }} 
+            onBack={() => setCurrentView(AppView.ADMIN_DASHBOARD)} 
+          />
+        );
+      case AppView.ADMIN_SYSTEM:
+        return (
+          <AdminSystem 
+            onReset={async () => {
+              try {
+                await fetch('/api/reset', { method: 'POST' });
+                handleSystemRefresh(AppView.LOGIN);
+              } catch (e) {
+                console.error("Lỗi reset hệ thống:", e);
+              }
+            }}
+            onImportSuccess={() => handleSystemRefresh(AppView.LOGIN)}
             onBack={() => setCurrentView(AppView.ADMIN_DASHBOARD)} 
           />
         );
@@ -1387,6 +1453,7 @@ const App: React.FC = () => {
                   <span className="text-[7px] font-black uppercase tracking-widest">Người dùng</span>
                 </button>
                 <button onClick={() => setCurrentView(AppView.ADMIN_BUDGET)} className={`flex flex-col items-center gap-1 flex-1 ${currentView === AppView.ADMIN_BUDGET ? 'text-[#ff8c00]' : 'text-gray-500'}`}><Wallet size={22} /><span className="text-[7px] font-black uppercase tracking-widest">Ngân sách</span></button>
+                <button onClick={() => setCurrentView(AppView.ADMIN_SYSTEM)} className={`flex flex-col items-center gap-1 flex-1 ${currentView === AppView.ADMIN_SYSTEM ? 'text-[#ff8c00]' : 'text-gray-500'}`}><Settings size={22} /><span className="text-[7px] font-black uppercase tracking-widest">Hệ thống</span></button>
               </>
             ) : (
               <>

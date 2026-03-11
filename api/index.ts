@@ -502,6 +502,86 @@ app.post(["/api/sync", "/sync"], async (req, res) => {
   }
 });
 
+app.post(["/api/reset", "/reset"], async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    
+    // Delete all data except admin
+    await Promise.all([
+      supabase.from('users').delete().neq('id', 'AD01'),
+      supabase.from('loans').delete().neq('id', 'KEEP_NONE'),
+      supabase.from('notifications').delete().neq('id', 'KEEP_NONE'),
+      supabase.from('config').upsert({ key: 'budget', value: 30000000 }, { onConflict: 'key' }),
+      supabase.from('config').upsert({ key: 'rankProfit', value: 0 }, { onConflict: 'key' }),
+      supabase.from('config').upsert({ key: 'loanProfit', value: 0 }, { onConflict: 'key' }),
+      supabase.from('config').upsert({ key: 'monthlyStats', value: [] }, { onConflict: 'key' })
+    ]);
+    
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Lỗi trong /api/reset:", e);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.post(["/api/import", "/import"], async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+    const { users, loans, notifications, budget, rankProfit, loanProfit, monthlyStats } = req.body;
+    
+    // 1. Upsert users first to satisfy foreign key constraints in loans/notifications
+    if (users && Array.isArray(users) && users.length > 0) {
+      const { error: userError } = await supabase.from('users').upsert(users, { onConflict: 'id' });
+      if (userError) {
+        console.error("Import users error:", userError);
+        return res.status(500).json({ success: false, message: "Lỗi khi lưu danh sách người dùng", error: userError });
+      }
+    }
+    
+    // 2. Upsert other data in parallel
+    const tasks = [];
+    
+    if (loans && Array.isArray(loans) && loans.length > 0) {
+      tasks.push(supabase.from('loans').upsert(loans, { onConflict: 'id' }));
+    }
+    
+    if (notifications && Array.isArray(notifications) && notifications.length > 0) {
+      tasks.push(supabase.from('notifications').upsert(notifications, { onConflict: 'id' }));
+    }
+    
+    if (budget !== undefined) {
+      tasks.push(supabase.from('config').upsert({ key: 'budget', value: budget }, { onConflict: 'key' }));
+    }
+    
+    if (rankProfit !== undefined) {
+      tasks.push(supabase.from('config').upsert({ key: 'rankProfit', value: rankProfit }, { onConflict: 'key' }));
+    }
+
+    if (loanProfit !== undefined) {
+      tasks.push(supabase.from('config').upsert({ key: 'loanProfit', value: loanProfit }, { onConflict: 'key' }));
+    }
+
+    if (monthlyStats !== undefined) {
+      tasks.push(supabase.from('config').upsert({ key: 'monthlyStats', value: monthlyStats }, { onConflict: 'key' }));
+    }
+    
+    if (tasks.length > 0) {
+      const results = await Promise.all(tasks);
+      const errors = results.filter(r => r.error).map(r => r.error);
+      
+      if (errors.length > 0) {
+        console.error("Import secondary data errors:", errors);
+        return res.status(500).json({ success: false, message: "Lỗi khi lưu dữ liệu phụ trợ", errors });
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error("Lỗi trong /api/import:", e);
+    res.status(500).json({ error: e.message || "Internal Server Error" });
+  }
+});
+
 // Specific health check for Vercel deployment verification
 app.get(["/api/api-health", "/api-health", "/api", "/"], (req, res) => {
   res.json({ 
