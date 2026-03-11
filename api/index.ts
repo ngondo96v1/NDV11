@@ -38,15 +38,36 @@ const supabase = (() => {
 
 const STORAGE_LIMIT_MB = 45; // Virtual limit for demo purposes
 
-const app = express();
+const router = express.Router();
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+router.use(cors());
+router.use(express.json({ limit: '50mb' }));
 
-// Debug middleware to log incoming requests on Vercel
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'production') {
-    console.log(`[API] ${req.method} ${req.url}`);
+// Debug middleware to log incoming requests
+router.use((req, res, next) => {
+  console.log(`[API DEBUG] ${req.method} ${req.url} (Base: ${req.baseUrl})`);
+  next();
+});
+
+// Middleware to check Supabase reachability
+router.use(async (req, res, next) => {
+  if (req.path === '/api-health' || req.path === '/supabase-status') return next();
+  
+  if (!supabase) {
+    return res.status(500).json({
+      error: "Cấu hình Supabase không hợp lệ",
+      message: "Hệ thống chưa được cấu hình Supabase URL hoặc Service Role Key."
+    });
+  }
+
+  const reachability = await checkSupabaseReachability();
+  if (!reachability.reachable) {
+    console.error(`[API ERROR] Supabase unreachable for ${req.method} ${req.url}:`, reachability.error || reachability.status);
+    return res.status(503).json({
+      error: "Dịch vụ tạm thời không khả dụng",
+      message: "Không thể kết nối tới cơ sở dữ liệu Supabase. Có thể dự án đã bị tạm dừng hoặc đang gặp sự cố kỹ thuật (502 Bad Gateway).",
+      details: reachability.error || `Status: ${reachability.status}`
+    });
   }
   next();
 });
@@ -134,7 +155,7 @@ const autoCleanupStorage = async () => {
 };
 
 // Supabase Status check for Admin
-app.get(["/api/supabase-status", "/supabase-status"], async (req, res) => {
+router.get("/supabase-status", async (req, res) => {
   try {
     if (!supabase) {
       return res.json({ 
@@ -161,17 +182,23 @@ app.get(["/api/supabase-status", "/supabase-status"], async (req, res) => {
   }
 });
 
-// API Routes
-app.get(["/api/data", "/data"], async (req, res) => {
+// Helper to check if Supabase is reachable
+const checkSupabaseReachability = async () => {
+  if (!SUPABASE_URL) return { reachable: false, error: "Supabase URL is missing" };
   try {
-    if (!supabase) {
-      console.error("Supabase client not initialized. Check environment variables.");
-      return res.status(500).json({
-        error: "Cấu hình Supabase không hợp lệ",
-        message: "Hệ thống chưa được cấu hình Supabase URL hoặc Service Role Key."
-      });
-    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(SUPABASE_URL, { method: 'HEAD', signal: controller.signal });
+    clearTimeout(timeout);
+    return { reachable: response.ok || response.status < 500, status: response.status };
+  } catch (e: any) {
+    return { reachable: false, error: e.message };
+  }
+};
 
+// API Routes
+router.get("/data", async (req, res) => {
+  try {
     const userId = req.query.userId as string;
     const isAdmin = req.query.isAdmin === 'true';
 
@@ -282,7 +309,7 @@ app.get(["/api/data", "/data"], async (req, res) => {
   }
 });
 
-app.post(["/api/users", "/users"], async (req, res) => {
+router.post("/users", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const incomingUsers = req.body;
@@ -309,7 +336,7 @@ app.post(["/api/users", "/users"], async (req, res) => {
   }
 });
 
-app.post(["/api/loans", "/loans"], async (req, res) => {
+router.post("/loans", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const incomingLoans = req.body;
@@ -357,7 +384,7 @@ app.post(["/api/loans", "/loans"], async (req, res) => {
   }
 });
 
-app.post(["/api/notifications", "/notifications"], async (req, res) => {
+router.post("/notifications", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const incomingNotifs = req.body;
@@ -384,7 +411,7 @@ app.post(["/api/notifications", "/notifications"], async (req, res) => {
   }
 });
 
-app.post(["/api/budget", "/budget"], async (req, res) => {
+router.post("/budget", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const { budget } = req.body;
@@ -397,7 +424,7 @@ app.post(["/api/budget", "/budget"], async (req, res) => {
   }
 });
 
-app.post(["/api/rankProfit", "/rankProfit"], async (req, res) => {
+router.post("/rankProfit", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const { rankProfit } = req.body;
@@ -410,7 +437,7 @@ app.post(["/api/rankProfit", "/rankProfit"], async (req, res) => {
   }
 });
 
-app.post(["/api/loanProfit", "/loanProfit"], async (req, res) => {
+router.post("/loanProfit", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const { loanProfit } = req.body;
@@ -423,7 +450,7 @@ app.post(["/api/loanProfit", "/loanProfit"], async (req, res) => {
   }
 });
 
-app.post(["/api/monthlyStats", "/monthlyStats"], async (req, res) => {
+router.post("/monthlyStats", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const { monthlyStats } = req.body;
@@ -436,7 +463,7 @@ app.post(["/api/monthlyStats", "/monthlyStats"], async (req, res) => {
   }
 });
 
-app.delete(["/api/users/:id", "/users/:id"], async (req, res) => {
+router.delete("/users/:id", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const userId = req.params.id;
@@ -452,7 +479,7 @@ app.delete(["/api/users/:id", "/users/:id"], async (req, res) => {
   }
 });
 
-app.post(["/api/sync", "/sync"], async (req, res) => {
+router.post("/sync", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const { users, loans, notifications, budget, rankProfit, loanProfit, monthlyStats } = req.body;
@@ -502,7 +529,7 @@ app.post(["/api/sync", "/sync"], async (req, res) => {
   }
 });
 
-app.post(["/api/reset", "/reset"], async (req, res) => {
+router.post("/reset", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     
@@ -524,7 +551,7 @@ app.post(["/api/reset", "/reset"], async (req, res) => {
   }
 });
 
-app.post(["/api/import", "/import"], async (req, res) => {
+router.post("/import", async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
     const { users, loans, notifications, budget, rankProfit, loanProfit, monthlyStats } = req.body;
@@ -583,7 +610,7 @@ app.post(["/api/import", "/import"], async (req, res) => {
 });
 
 // Specific health check for Vercel deployment verification
-app.get(["/api/api-health", "/api-health", "/api", "/"], (req, res) => {
+router.get("/api-health", (req, res) => {
   res.json({ 
     status: "ok", 
     environment: process.env.NODE_ENV || 'production', 
@@ -595,7 +622,7 @@ app.get(["/api/api-health", "/api-health", "/api", "/"], (req, res) => {
 });
 
 // 404 handler for API routes
-app.use((req, res) => {
+router.use((req, res) => {
   console.warn(`404 API Route: ${req.method} ${req.url}`);
   res.status(404).json({ 
     error: "API Route Not Found", 
@@ -605,5 +632,5 @@ app.use((req, res) => {
   });
 });
 
-// Export the app for Vercel
-export default app;
+// Export the router for Vercel
+export default router;
