@@ -890,9 +890,27 @@ const App: React.FC = () => {
       if (action === 'DISBURSE') {
         addNotification(loan.userId, 'Giải ngân thành công', `Khoản vay ID ${loan.id} đã được giải ngân vào tài khoản của bạn.`, 'LOAN');
       } else if (action === 'SETTLE') {
-        addNotification(loan.userId, 'Tất toán thành công', `Khoản vay ID ${loan.id} đã được tất toán hoàn tất.`, 'LOAN');
+        if (loan.settlementType === 'PRINCIPAL') {
+          addNotification(loan.userId, 'Gia hạn thành công', `Khoản vay ID ${loan.id} đã được gia hạn (Vay Gốc) thành công. Hạn trả mới: ${newDueDate}.`, 'LOAN');
+        } else {
+          addNotification(loan.userId, 'Tất toán thành công', `Khoản vay ID ${loan.id} đã được tất toán toàn bộ gốc và lãi thành công.`, 'LOAN');
+        }
       } else if (action === 'REJECT') {
-        addNotification(loan.userId, 'Yêu cầu bị từ chối', `Yêu cầu cho khoản vay ID ${loan.id} đã bị từ chối. Lý do: ${rejectionReason || 'Không xác định'}`, 'LOAN');
+        const isSettlementReject = loan.status === 'CHỜ TẤT TOÁN';
+        let title = 'Yêu cầu bị từ chối';
+        let typeStr = '';
+        
+        if (isSettlementReject) {
+          if (loan.settlementType === 'PRINCIPAL') {
+            title = 'Từ chối gia hạn';
+            typeStr = 'gia hạn (Vay Gốc) cho ';
+          } else {
+            title = 'Từ chối tất toán';
+            typeStr = 'tất toán toàn bộ cho ';
+          }
+        }
+        
+        addNotification(loan.userId, title, `Yêu cầu ${typeStr}khoản vay ID ${loan.id} đã bị từ chối. Lý do: ${rejectionReason || 'Không xác định'}`, 'LOAN');
       }
     } catch (e: any) {
       console.error("Lỗi lưu thay đổi khoản vay Admin:", e.message || e);

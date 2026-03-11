@@ -306,7 +306,7 @@ const AdminLoanApproval: React.FC<AdminLoanApprovalProps> = ({ loans, isGlobalPr
                                     disabled={!!isProcessing || isGlobalProcessing}
                                     className={`flex-1 bg-green-600 text-white py-2.5 rounded-lg font-black text-[9px] uppercase active:scale-95 transition-all flex items-center justify-center gap-1.5 ${isProcessing === loan.id || isGlobalProcessing ? 'opacity-50' : ''}`}
                                   >
-                                    <CheckCircle2 size={12} /> {isProcessing === loan.id || isGlobalProcessing ? 'Đang xác nhận...' : 'Xác nhận bill'}
+                                    <CheckCircle2 size={12} /> {isProcessing === loan.id || isGlobalProcessing ? 'Đang xác nhận...' : (loan.settlementType === 'ALL' ? 'Xác nhận Tất toán' : 'Xác nhận Gia hạn')}
                                   </button>
                                   <button 
                                     onClick={() => setRejectingLoanId(rejectingLoanId === loan.id ? null : loan.id)}
