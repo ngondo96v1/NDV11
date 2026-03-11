@@ -640,7 +640,7 @@ const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ users, loans,
                                             disabled={isGlobalProcessing}
                                             className={`flex-1 bg-green-600 text-white py-3 rounded-lg font-black text-[9px] uppercase flex items-center justify-center gap-1.5 active:scale-95 transition-all ${isGlobalProcessing ? 'opacity-50' : ''}`}
                                           >
-                                            <CheckCircle2 size={12} /> {isGlobalProcessing ? 'Đang xử lý...' : 'Duyệt bill'}
+                                            <CheckCircle2 size={12} /> {isGlobalProcessing ? 'Đang xử lý...' : (loan.settlementType === 'ALL' ? 'Xác nhận Tất toán' : 'Xác nhận Gia hạn')}
                                           </button>
                                           <button 
                                             onClick={(e) => {
