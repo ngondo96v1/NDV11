@@ -151,17 +151,26 @@ const App: React.FC = () => {
         clearTimeout(timeout);
 
         if (!response.ok) {
-          let errorMessage = `Server returned ${response.status}: ${response.statusText}`;
+          let errorMessage = `Lỗi Server ${response.status}${response.statusText ? ': ' + response.statusText : ''}`;
           try {
-            const errorData = await response.json();
-            if (errorData.message) errorMessage = errorData.message;
-            else if (errorData.error) errorMessage = errorData.error;
+            const text = await response.text();
+            try {
+              const errorData = JSON.parse(text);
+              if (errorData.message) errorMessage = errorData.message;
+              else if (errorData.error) errorMessage = errorData.error;
+              else if (errorData.details) errorMessage = `${errorMessage} (${errorData.details})`;
+            } catch (e) {
+              // Not JSON, use the raw text if it's short and looks like a message
+              if (text && text.length < 250 && !text.includes('<!DOCTYPE')) {
+                errorMessage = text;
+              }
+            }
           } catch (e) {
-            // Not a JSON error response
+            // Error reading body
           }
           
           // Detect database errors
-          if (response.status === 500 || errorMessage.toLowerCase().includes('database') || errorMessage.toLowerCase().includes('supabase')) {
+          if (response.status === 500 || response.status === 503 || errorMessage.toLowerCase().includes('database') || errorMessage.toLowerCase().includes('supabase') || errorMessage.toLowerCase().includes('kết nối')) {
             setDbError(errorMessage);
           }
           

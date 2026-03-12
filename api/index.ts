@@ -40,9 +40,6 @@ const STORAGE_LIMIT_MB = 45; // Virtual limit for demo purposes
 
 const router = express.Router();
 
-router.use(cors());
-router.use(express.json({ limit: '50mb' }));
-
 // Debug middleware to log incoming requests
 router.use((req, res, next) => {
   console.log(`[API DEBUG] ${req.method} ${req.url} (Base: ${req.baseUrl})`);
@@ -642,16 +639,15 @@ router.get("/api-health", (req, res) => {
   });
 });
 
-// 404 handler for API routes
-router.use((req, res) => {
-  console.warn(`404 API Route: ${req.method} ${req.url}`);
-  res.status(404).json({ 
-    error: "API Route Not Found", 
-    path: req.url,
-    method: req.method,
-    message: "Nếu bạn thấy lỗi này trên Vercel, hãy kiểm tra lại cấu hình rewrites trong vercel.json. Đảm bảo /api/(.*) trỏ về /api/index.ts"
-  });
+// Export the router for Vercel
+router.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("[API ROUTER ERROR]:", err);
+  const status = err.status || err.statusCode || 500;
+  sendSafeJson(res, {
+    error: "API Error",
+    message: err.message || "Đã xảy ra lỗi trong quá trình xử lý API",
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  }, status);
 });
 
-// Export the router for Vercel
 export default router;

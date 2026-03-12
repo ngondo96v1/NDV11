@@ -69,7 +69,7 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
-  // Global error handler
+  // Global error handler - MUST be after all other routes
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("UNHANDLED ERROR:", err);
     
@@ -77,14 +77,18 @@ async function startServer() {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Đã xảy ra lỗi hệ thống không xác định";
     
-    res.status(status).json({ 
-      error: "Internal Server Error", 
-      message: message,
-      path: req.url,
-      method: req.method,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
+    if (!res.headersSent) {
+      res.status(status).json({ 
+        error: "Internal Server Error", 
+        message: message,
+        path: req.url,
+        method: req.method,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
+    }
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("CRITICAL: Failed to start server:", err);
+});
