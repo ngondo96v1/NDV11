@@ -72,9 +72,16 @@ async function startServer() {
   // Global error handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("UNHANDLED ERROR:", err);
-    res.status(500).json({ 
+    
+    // Ensure we always return JSON
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Đã xảy ra lỗi hệ thống không xác định";
+    
+    res.status(status).json({ 
       error: "Internal Server Error", 
-      message: err.message,
+      message: message,
+      path: req.url,
+      method: req.method,
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   });
