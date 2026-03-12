@@ -40,6 +40,9 @@ const STORAGE_LIMIT_MB = 45; // Virtual limit for demo purposes
 
 const router = express.Router();
 
+router.use(cors());
+router.use(express.json({ limit: '50mb' }));
+
 // Debug middleware to log incoming requests
 router.use((req, res, next) => {
   console.log(`[API DEBUG] ${req.method} ${req.url} (Base: ${req.baseUrl})`);
@@ -74,20 +77,6 @@ const safeJsonStringify = (data: any) => {
   return JSON.stringify(data, (key, value) =>
     typeof value === 'bigint' ? value.toString() : value
   );
-};
-
-// Helper to send JSON response safely
-const sendSafeJson = (res: express.Response, data: any, status = 200) => {
-  try {
-    const json = safeJsonStringify(data);
-    res.status(status).set('Content-Type', 'application/json').send(json);
-  } catch (e: any) {
-    console.error("[API ERROR] Failed to serialize JSON:", e);
-    res.status(500).json({
-      error: "Lỗi serialization",
-      message: "Không thể chuyển đổi dữ liệu sang JSON: " + e.message
-    });
-  }
 };
 
 // Helper to estimate JSON size in MB
@@ -213,13 +202,6 @@ router.get("/data", async (req, res) => {
     const userId = req.query.userId as string;
     const isAdmin = req.query.isAdmin === 'true';
 
-    if (!supabase) {
-      return res.status(500).json({
-        error: "Cấu hình Supabase không hợp lệ",
-        message: "Hệ thống chưa được cấu hình Supabase URL hoặc Service Role Key."
-      });
-    }
-
     // Individual query functions with role-based filtering
     const fetchUsers = async () => {
       try {
@@ -230,8 +212,8 @@ router.get("/data", async (req, res) => {
         const { data, error } = await query;
         if (error) throw error;
         return data || [];
-      } catch (e: any) {
-        console.error("Lỗi fetch users:", e.message || e);
+      } catch (e) {
+        console.error("Lỗi fetch users:", e);
         return [];
       }
     };
@@ -245,8 +227,8 @@ router.get("/data", async (req, res) => {
         const { data, error } = await query;
         if (error) throw error;
         return data || [];
-      } catch (e: any) {
-        console.error("Lỗi fetch loans:", e.message || e);
+      } catch (e) {
+        console.error("Lỗi fetch loans:", e);
         return [];
       }
     };
@@ -260,8 +242,8 @@ router.get("/data", async (req, res) => {
         const { data, error } = await query.limit(100);
         if (error) throw error;
         return data || [];
-      } catch (e: any) {
-        console.error("Lỗi fetch notifications:", e.message || e);
+      } catch (e) {
+        console.error("Lỗi fetch notifications:", e);
         return [];
       }
     };
@@ -271,8 +253,8 @@ router.get("/data", async (req, res) => {
         const { data, error } = await supabase.from('config').select('*');
         if (error) throw error;
         return data || [];
-      } catch (e: any) {
-        console.error("Lỗi fetch config:", e.message || e);
+      } catch (e) {
+        console.error("Lỗi fetch config:", e);
         return [];
       }
     };
@@ -313,7 +295,7 @@ router.get("/data", async (req, res) => {
       autoCleanupStorage();
     }
 
-    sendSafeJson(res, {
+    res.json({
       ...payload,
       storageFull: isFull,
       storageUsage: usage.toFixed(2)
@@ -322,7 +304,7 @@ router.get("/data", async (req, res) => {
     console.error("Lỗi nghiêm trọng trong /api/data:", e);
     res.status(500).json({ 
       error: "Lỗi hệ thống", 
-      message: `Đã xảy ra lỗi nghiêm trọng: ${e.message || "Không xác định"}. Vui lòng kiểm tra lại kết nối Supabase.` 
+      message: e.message || "Đã xảy ra lỗi không xác định khi truy xuất dữ liệu từ Supabase. Vui lòng kiểm tra lại bảng và quyền truy cập." 
     });
   }
 });
@@ -347,10 +329,10 @@ router.post("/users", async (req, res) => {
       });
     }
     
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/users:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -395,10 +377,10 @@ router.post("/loans", async (req, res) => {
       });
     }
     
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/loans:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -422,10 +404,10 @@ router.post("/notifications", async (req, res) => {
       });
     }
     
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/notifications:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -435,10 +417,10 @@ router.post("/budget", async (req, res) => {
     const { budget } = req.body;
     const { error } = await supabase.from('config').upsert({ key: 'budget', value: budget }, { onConflict: 'key' });
     if (error) throw error;
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/budget:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -448,10 +430,10 @@ router.post("/rankProfit", async (req, res) => {
     const { rankProfit } = req.body;
     const { error } = await supabase.from('config').upsert({ key: 'rankProfit', value: rankProfit }, { onConflict: 'key' });
     if (error) throw error;
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/rankProfit:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -461,10 +443,10 @@ router.post("/loanProfit", async (req, res) => {
     const { loanProfit } = req.body;
     const { error } = await supabase.from('config').upsert({ key: 'loanProfit', value: loanProfit }, { onConflict: 'key' });
     if (error) throw error;
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/loanProfit:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -474,10 +456,10 @@ router.post("/monthlyStats", async (req, res) => {
     const { monthlyStats } = req.body;
     const { error } = await supabase.from('config').upsert({ key: 'monthlyStats', value: monthlyStats }, { onConflict: 'key' });
     if (error) throw error;
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/monthlyStats:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -490,10 +472,10 @@ router.delete("/users/:id", async (req, res) => {
       supabase.from('loans').delete().eq('userId', userId),
       supabase.from('notifications').delete().eq('userId', userId)
     ]);
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong DELETE /api/users/:id:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -540,10 +522,10 @@ router.post("/sync", async (req, res) => {
       return res.status(207).json({ success: false, errors });
     }
     
-    sendSafeJson(res, { success: true });
+    res.json({ success: true });
   } catch (e: any) {
     console.error("Lỗi trong /api/sync:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: e.message || "Internal Server Error" });
   }
 });
 
@@ -562,10 +544,10 @@ router.post("/reset", async (req, res) => {
       supabase.from('config').upsert({ key: 'monthlyStats', value: [] }, { onConflict: 'key' })
     ]);
     
-    sendSafeJson(res, { success: true });
-  } catch (e: any) {
+    res.json({ success: true });
+  } catch (e) {
     console.error("Lỗi trong /api/reset:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -620,10 +602,10 @@ router.post("/import", async (req, res) => {
       }
     }
     
-    sendSafeJson(res, { success: true });
+    res.json({ success: true });
   } catch (e: any) {
     console.error("Lỗi trong /api/import:", e);
-    res.status(500).json({ error: "Internal Server Error", message: e.message });
+    res.status(500).json({ error: e.message || "Internal Server Error" });
   }
 });
 
@@ -639,15 +621,16 @@ router.get("/api-health", (req, res) => {
   });
 });
 
-// Export the router for Vercel
-router.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("[API ROUTER ERROR]:", err);
-  const status = err.status || err.statusCode || 500;
-  sendSafeJson(res, {
-    error: "API Error",
-    message: err.message || "Đã xảy ra lỗi trong quá trình xử lý API",
-    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  }, status);
+// 404 handler for API routes
+router.use((req, res) => {
+  console.warn(`404 API Route: ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    error: "API Route Not Found", 
+    path: req.url,
+    method: req.method,
+    message: "Nếu bạn thấy lỗi này trên Vercel, hãy kiểm tra lại cấu hình rewrites trong vercel.json. Đảm bảo /api/(.*) trỏ về /api/index.ts"
+  });
 });
 
+// Export the router for Vercel
 export default router;
